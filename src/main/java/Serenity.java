@@ -26,9 +26,9 @@ public class Serenity {
         Map<Date, Float> DATE_PROFIT_MAP = new TreeMap<>();
         Map<Date, List<String>> STRING_LIST_MAP = new TreeMap<>();
 
-        PrintWriter printWriter = new PrintWriter(new File("FinalResults/backTestOutput/result-serenity" + "-" + new Date().getTime()));
+        PrintWriter printWriter = new PrintWriter(new File("FinalResults/backTestOutput/result-serenity-pain" + "-" + new Date().getTime()));
         printWriter.flush();
-        File fileo = new File("FinalResults/input/atm");
+        File fileo = new File("FinalResults/input/pain");
         File[] files = fileo.listFiles();
         Arrays.sort(files);
 
