@@ -3,19 +3,26 @@ import lombok.Setter;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.StringUtils;
 import utils.NormalCandle;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class Serenity {
+public class Serenity_2_0 {
 
     private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(1);
     private static final AtomicInteger trades =new AtomicInteger(0);
@@ -26,9 +33,9 @@ public class Serenity {
         Map<Date, Float> DATE_PROFIT_MAP = new TreeMap<>();
         Map<Date, List<String>> STRING_LIST_MAP = new TreeMap<>();
 
-        PrintWriter printWriter = new PrintWriter(new File("FinalResults/backTestOutput/result-serenity-atm" + "-" + new Date().getTime()));
+        PrintWriter printWriter = new PrintWriter(new File("FinalResults/backTestOutput/result-serenity-atm-2.0-" + "-" + new Date().getTime()));
         printWriter.flush();
-        File fileo = new File("FinalResults/input/pain");
+        File fileo = new File("FinalResults/input/atm");
         File[] files = fileo.listFiles();
         Arrays.sort(files);
 
@@ -60,9 +67,6 @@ public class Serenity {
 
                     DATE_PROFIT_MAP.put(date,serenityAlgo.profitLoss);
                     STRING_LIST_MAP.put(date, serenityAlgo.tradeLogs);
-                    if(serenityAlgo.shortStraddle){
-                        trades.addAndGet(4);
-                    }
                     System.out.println("finished for date "+date);
                 }
             });
@@ -217,10 +221,15 @@ public class Serenity {
             }
             float vwap = priceVolumeSum / volumeSum;
 
-            if (!shortStraddle && closeVolumeList.get(closeVolumeList.size() - 1).getClose() < vwap) {
+            if (!shortStraddle && closeVolumeList.get(closeVolumeList.size() - 1).getClose() < vwap && (closeVolumeList.size() <2 || closeVolumeList.get(closeVolumeList.size() - 2).getClose() > vwap)) {
+                if(closeVolumeList.get(closeVolumeList.size()-1).date.getHours() >= 15 && closeVolumeList.get(closeVolumeList.size()-1).date.getMinutes()>=20){
+                    return true;
+                }else {
                     shortStraddleEntryPrice = closeVolumeList.get(closeVolumeList.size() - 1).getClose();
                     shortStraddle = true;
-                    tradeLogs.add("Shorting straddle at "+closeVolumeList.get(closeVolumeList.size() - 1).date +" at price "+ shortStraddleEntryPrice +" for strike price "+strikeCE+"/"+strikePE);
+                    trades.addAndGet(4);
+                    tradeLogs.add("Shorting straddle at " + closeVolumeList.get(closeVolumeList.size() - 1).date + " at price " + shortStraddleEntryPrice + " for strike price " + strikeCE + "/" + strikePE);
+                }
             }
 
             if(shortStraddle) {
@@ -228,18 +237,25 @@ public class Serenity {
                     //stoploss of 10% hit
                     profitLoss = quantityPerLot * (shortStraddleEntryPrice - closeVolumeList.get(closeVolumeList.size() - 1).getClose());
                     tradeLogs.add("Exiting Shorting straddle at "+closeVolumeList.get(closeVolumeList.size() - 1).date +" at price "+ closeVolumeList.get(closeVolumeList.size() - 1).getClose());
-                    return true;
-                }else if(closeVolumeList.get(closeVolumeList.size() - 1).getClose() < vwap * 0.7){
+                    shortStraddle = false;
+                    return false;
+                }else if(closeVolumeList.get(closeVolumeList.size() - 1).getClose() < vwap * 0.8){
                     //target of 30% hit
                     profitLoss = quantityPerLot * (shortStraddleEntryPrice - closeVolumeList.get(closeVolumeList.size() - 1).getClose());
                     tradeLogs.add("Exiting Shorting straddle at "+closeVolumeList.get(closeVolumeList.size() - 1).date +" at price "+ closeVolumeList.get(closeVolumeList.size() - 1).getClose());
-                    return true;
+                    shortStraddle = false;
+                    return false;
                 }else if(closeVolumeList.get(closeVolumeList.size()-1).date.getHours() >= 15 && closeVolumeList.get(closeVolumeList.size()-1).date.getMinutes()>=20){
                     //exit at 15:20
                     profitLoss = quantityPerLot * (shortStraddleEntryPrice - closeVolumeList.get(closeVolumeList.size() - 1).getClose());
                     tradeLogs.add("Exiting Shorting straddle at "+closeVolumeList.get(closeVolumeList.size() - 1).date +" at price "+ closeVolumeList.get(closeVolumeList.size() - 1).getClose());
+                    shortStraddle = false;
                     return true;
                 }
+            }
+
+            if(closeVolumeList.get(closeVolumeList.size()-1).date.getHours() >= 15 && closeVolumeList.get(closeVolumeList.size()-1).date.getMinutes()>=20){
+                return true;
             }
             return false;
         }
