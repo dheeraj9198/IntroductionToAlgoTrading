@@ -16,7 +16,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class Chaos {
+public class BuyAlgo {
 
     private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(1);
     private static final AtomicInteger trades = new AtomicInteger(0);
@@ -63,7 +63,7 @@ public class Chaos {
                     DATE_PROFIT_MAP.put(date, serenityAlgo.profitLoss);
                     STRING_LIST_MAP.put(date, serenityAlgo.tradeLogs);
                     if (serenityAlgo.shortStraddle) {
-                        trades.addAndGet(4);
+                        trades.addAndGet(2);
                     }
                     System.out.println("finished for date " + date);
                 }
@@ -189,6 +189,7 @@ public class Chaos {
 
         private boolean shortStraddle = false;
         private float shortStraddleEntryPrice = 0;
+        private String strike;
         private float profitLoss;
         private List<String> tradeLogs = new ArrayList<>();
 
@@ -196,14 +197,23 @@ public class Chaos {
             List<CloseVolume> closeVolumeList = new ArrayList<>();
             String strikeCE = "";
             String strikePE = "";
+
+            float cePriceVolumeSum = 0;
+            float ceVolumeSum = 0;
+
+            float pePriceVolumeSum = 0;
+            float peVolumeSum = 0;
+
             for (int x = 0; x < normalCandleListPE.size(); x++) {
+                cePriceVolumeSum = cePriceVolumeSum + normalCandleListCE.get(x).getVolume() * normalCandleListCE.get(x).getClose();
+                pePriceVolumeSum = pePriceVolumeSum + normalCandleListPE.get(x).getVolume() * normalCandleListPE.get(x).getClose();
+
+                ceVolumeSum = ceVolumeSum + normalCandleListCE.get(x).getVolume();
+                peVolumeSum = peVolumeSum + normalCandleListPE.get(x).getVolume();
+
                 float close = normalCandleListCE.get(x).getClose() + normalCandleListPE.get(x).getClose();
-
-                float high = normalCandleListCE.get(x).getHigh() + normalCandleListPE.get(x).getLow();
-                float low = normalCandleListCE.get(x).getLow() + normalCandleListPE.get(x).getHigh();
-
                 long volume = normalCandleListCE.get(x).getVolume() + normalCandleListPE.get(x).getVolume();
-                closeVolumeList.add(new CloseVolume(close, /*(close+high+low)/3*/close, volume, normalCandleListCE.get(x).getDate()));
+                closeVolumeList.add(new CloseVolume(close, close, volume, normalCandleListCE.get(x).getDate()));
                 strikeCE = normalCandleListCE.get(x).getSymbol();
                 strikePE = normalCandleListPE.get(x).getSymbol();
             }
@@ -216,29 +226,45 @@ public class Chaos {
                 volumeSum = volumeSum + closeVolume.getVolume();
                 closeVolume.setVwap(priceVolumeSum / volumeSum);
             }
-            float vwap = priceVolumeSum / volumeSum;
+            float straddleVwap = priceVolumeSum / volumeSum;
 
-            if (!shortStraddle && closeVolumeList.get(closeVolumeList.size() - 1).getClose() > vwap * 1.15) {
-                shortStraddleEntryPrice = closeVolumeList.get(closeVolumeList.size() - 1).getClose();
-                shortStraddle = true;
-                tradeLogs.add("Entering Long straddle at " + closeVolumeList.get(closeVolumeList.size() - 1).date + " at price " + shortStraddleEntryPrice + " for strike price " + strikeCE + "/" + strikePE);
+            float ceVwap = cePriceVolumeSum/ceVolumeSum;
+            float peVwap = pePriceVolumeSum/peVolumeSum;
+
+            if (!shortStraddle && closeVolumeList.get(closeVolumeList.size() - 1).getClose() > straddleVwap * 1.15) {
+                if(normalCandleListCE.get(normalCandleListCE.size()-1).getClose() > ceVwap){
+                    shortStraddleEntryPrice = normalCandleListCE.get(normalCandleListCE.size()-1).getClose();
+                    shortStraddle = true;
+                    strike = strikeCE;
+                }else if(normalCandleListPE.get(normalCandleListPE.size()-1).getClose() > peVwap){
+                    shortStraddleEntryPrice = normalCandleListPE.get(normalCandleListPE.size()-1).getClose();
+                    shortStraddle = true;
+                    strike = strikePE;
+                }
+                tradeLogs.add("Entering Long straddle at " + closeVolumeList.get(closeVolumeList.size() - 1).date + " at price " + shortStraddleEntryPrice + " for strike price " + strike);
             }
 
             if (shortStraddle) {
-                if (closeVolumeList.get(closeVolumeList.size() - 1).getClose() > vwap * 1.6) {
+                float exitPrice = StringUtils.equals(strike, strikeCE) ? normalCandleListCE.get(normalCandleListCE.size()-1).getClose() : normalCandleListPE.get(normalCandleListCE.size()-1).getClose();
+                float exitVwap= StringUtils.equals(strike, strikeCE) ? ceVwap : peVwap;
+                if (closeVolumeList.get(closeVolumeList.size() - 1).getClose() > straddleVwap * 1.6) {
                     //profit of 10% hit
-                    profitLoss = -1 * quantityPerLot * (shortStraddleEntryPrice - closeVolumeList.get(closeVolumeList.size() - 1).getClose());
-                    tradeLogs.add("Exiting Long straddle at " + closeVolumeList.get(closeVolumeList.size() - 1).date + " at price " + closeVolumeList.get(closeVolumeList.size() - 1).getClose());
+                    profitLoss = -1 * quantityPerLot * (shortStraddleEntryPrice - exitPrice);
+                    tradeLogs.add("Exiting Long straddle at " + closeVolumeList.get(closeVolumeList.size() - 1).date + " at price " + exitPrice);
                     return true;
-                } else if (closeVolumeList.get(closeVolumeList.size() - 1).getClose() < vwap * 1.0) {
+                } else if (closeVolumeList.get(closeVolumeList.size() - 1).getClose() < straddleVwap * 1.0 || exitPrice < exitVwap*1.2) {
+                    if("33700CE".equals(strike)){
+                        System.out.println();
+                    }
+
                     //stoploss of 5% hit
-                    profitLoss = -1 * quantityPerLot * (shortStraddleEntryPrice - closeVolumeList.get(closeVolumeList.size() - 1).getClose());
-                    tradeLogs.add("Exiting Long straddle at " + closeVolumeList.get(closeVolumeList.size() - 1).date + " at price " + closeVolumeList.get(closeVolumeList.size() - 1).getClose());
+                    profitLoss = -1 * quantityPerLot * (shortStraddleEntryPrice - exitPrice);
+                    tradeLogs.add("Exiting Long straddle at " + closeVolumeList.get(closeVolumeList.size() - 1).date + " at price " + exitPrice);
                     return true;
-                } else if (closeVolumeList.get(closeVolumeList.size() - 1).date.getHours() >= 15 && closeVolumeList.get(closeVolumeList.size() - 1).date.getMinutes() >= 20) {
-                    //exit at 15:20
-                    profitLoss = -1 * quantityPerLot * (shortStraddleEntryPrice - closeVolumeList.get(closeVolumeList.size() - 1).getClose());
-                    tradeLogs.add("Exiting Long straddle at " + closeVolumeList.get(closeVolumeList.size() - 1).date + " at price " + closeVolumeList.get(closeVolumeList.size() - 1).getClose());
+                } else if (closeVolumeList.get(closeVolumeList.size() - 1).date.getHours() >= 15 && closeVolumeList.get(closeVolumeList.size() - 1).date.getMinutes() >= 15) {
+                    //exit at 15:15
+                    profitLoss = -1 * quantityPerLot * (shortStraddleEntryPrice - exitPrice);
+                    tradeLogs.add("Exiting Long straddle at " + closeVolumeList.get(closeVolumeList.size() - 1).date + " at price " + exitPrice);
                     return true;
                 }
             }
