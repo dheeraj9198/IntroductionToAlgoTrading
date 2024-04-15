@@ -25,16 +25,16 @@ public class SimpleStraddle {
     private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(10);
     private static final AtomicInteger trades =new AtomicInteger(0);
 
-    private static final String strikes = "pain";
+    private static final String strikes = "atm";
 
     @SneakyThrows
     public static void main(String[] strings) {
         Date start = new Date();
 
-        Map<Date, Float> DATE_PROFIT_MAP = new TreeMap<>();
+        Map<Date, Straddle> DATE_PROFIT_MAP = new TreeMap<>();
         Map<Date, List<String>> STRING_LIST_MAP = new TreeMap<>();
 
-        PrintWriter printWriter = new PrintWriter(new File("FinalResults/backTestOutput/result-simple-straddle-" +strikes+ "-" + new Date().getTime()));
+        PrintWriter printWriter = new PrintWriter(new File("FinalResults/backTestOutput/"+SimpleStraddle.class.getSimpleName()+"-" +strikes+ "-" + new Date().getTime()));
         printWriter.flush();
         File fileo = new File("FinalResults/input/"+strikes);
         File[] files = fileo.listFiles();
@@ -66,7 +66,7 @@ public class SimpleStraddle {
                         }
                     }
 
-                    DATE_PROFIT_MAP.put(date,straddle.profitLoss);
+                    DATE_PROFIT_MAP.put(date,straddle);
                     STRING_LIST_MAP.put(date, straddle.tradeLogs);
                     if(straddle.shortStraddle){
                         trades.addAndGet(4);
@@ -98,19 +98,34 @@ public class SimpleStraddle {
         int lossHits = 0;
 
         double aDouble = 0;
-        for (Map.Entry<Date, Float> dateDoubleEntry : DATE_PROFIT_MAP.entrySet()) {
-            aDouble = aDouble + dateDoubleEntry.getValue();
-            if (dateDoubleEntry.getValue() >= 0) {
+
+        float maxProfit = 0;
+        float maxLoss = 0;
+
+        float avgProfit = 0;
+        float avgLoss = 0;
+
+        for (Map.Entry<Date, Straddle> dateDoubleEntry : DATE_PROFIT_MAP.entrySet()) {
+            aDouble = aDouble + dateDoubleEntry.getValue().profitLoss;
+            if (dateDoubleEntry.getValue().profitLoss >= 0) {
                 profitHits = profitHits + 1;
+                maxProfit = Math.max(dateDoubleEntry.getValue().profitLoss , maxProfit);
+                avgProfit = avgProfit + dateDoubleEntry.getValue().profitLoss;
             }
-            if (dateDoubleEntry.getValue() < 0) {
+            if (dateDoubleEntry.getValue().profitLoss < 0) {
                 lossHits = lossHits + 1;
+                maxLoss = Math.min(dateDoubleEntry.getValue().profitLoss , maxLoss);
+                avgLoss = avgLoss + dateDoubleEntry.getValue().profitLoss;
             }
             totalDays = totalDays + 1;
-            printWriter.println(dateDoubleEntry.getKey().toString() + " : " + dateDoubleEntry.getValue());
-
+            printWriter.println(dateDoubleEntry.getKey().toString() + " : " + dateDoubleEntry.getValue().profitLoss+ " (Max profit : "+dateDoubleEntry.getValue().maxProfit+" AND max loss : "+dateDoubleEntry.getValue().maxLoss+")");
         }
-        printWriter.println("total profit = " + aDouble + ", profit hits : " + profitHits + "/" + totalDays + ", loss hits " + lossHits + "/" + totalDays + ", orders : " + trades.get() + " order cost " + (trades.get() * 40));
+        printWriter.println();
+        printWriter.println("total profit = " + aDouble + " ,orders : " + trades.get() + " order cost " + (trades.get() * 40));
+        printWriter.println("profit hits : " + profitHits + "/" + totalDays + " (" +(profitHits*100/totalDays)+ "%), loss hits " + lossHits + "/" + totalDays + " ("+(lossHits*100/totalDays)+"%)");
+        printWriter.println("Max profit : "+maxProfit+ " Max loss : "+maxLoss);
+        printWriter.println("Avg profit : "+avgProfit/totalDays+ " Avg loss : "+avgLoss/totalDays);
+
         printWriter.flush();
         printWriter.println("_______________________________________________");
         printWriter.println("_______________________________________________");
@@ -197,7 +212,10 @@ public class SimpleStraddle {
         private boolean shortStraddle = false;
         private float shortStraddleEntryPrice = 0;
         private float profitLoss;
-        private List<String> tradeLogs = new ArrayList<>();
+        private final List<String> tradeLogs = new ArrayList<>();
+
+        private float maxProfit = 0;
+        private float maxLoss = 0;
 
         public boolean executeTrades(List<NormalCandle> normalCandleListPE, List<NormalCandle> normalCandleListCE) {
             List<CloseVolume> closeVolumeList = new ArrayList<>();
@@ -223,8 +241,15 @@ public class SimpleStraddle {
 
             //exit trade
             if(shortStraddle) {
+                float tempPL = quantityPerLot * (shortStraddleEntryPrice - closeVolumeList.get(closeVolumeList.size() - 1).getClose());
+                if(tempPL > 0){
+                    maxProfit = Math.max(tempPL, maxProfit);
+                }else {
+                    maxLoss = Math.min(tempPL, maxLoss);
+                }
+
                 if(closeVolumeList.get(closeVolumeList.size()-1).date.getHours() >= 15 && closeVolumeList.get(closeVolumeList.size()-1).date.getMinutes()>=15){
-                    //exit at 15:20
+                    //exit at 15:15
                     profitLoss = quantityPerLot * (shortStraddleEntryPrice - closeVolumeList.get(closeVolumeList.size() - 1).getClose());
                     tradeLogs.add("Exiting Shorting straddle at "+closeVolumeList.get(closeVolumeList.size() - 1).date +" at price "+ closeVolumeList.get(closeVolumeList.size() - 1).getClose());
                     return true;

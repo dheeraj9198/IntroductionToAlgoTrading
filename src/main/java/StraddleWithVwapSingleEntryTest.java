@@ -3,19 +3,26 @@ import lombok.Setter;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.StringUtils;
 import utils.NormalCandle;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class Serenity {
+public class StraddleWithVwapSingleEntryTest {
 
     private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(1);
     private static final AtomicInteger trades =new AtomicInteger(0);
@@ -28,7 +35,7 @@ public class Serenity {
 
         PrintWriter printWriter = new PrintWriter(new File("FinalResults/backTestOutput/result-serenity-atm" + "-" + new Date().getTime()));
         printWriter.flush();
-        File fileo = new File("FinalResults/input/pain");
+        File fileo = new File("FinalResults/input/atm");
         File[] files = fileo.listFiles();
         Arrays.sort(files);
 
@@ -217,14 +224,14 @@ public class Serenity {
             }
             float vwap = priceVolumeSum / volumeSum;
 
-            if (!shortStraddle && closeVolumeList.get(closeVolumeList.size() - 1).getClose() < vwap) {
+            if (!shortStraddle && closeVolumeList.get(closeVolumeList.size() - 1).getClose() > vwap*1.5) {
                     shortStraddleEntryPrice = closeVolumeList.get(closeVolumeList.size() - 1).getClose();
                     shortStraddle = true;
                     tradeLogs.add("Shorting straddle at "+closeVolumeList.get(closeVolumeList.size() - 1).date +" at price "+ shortStraddleEntryPrice +" for strike price "+strikeCE+"/"+strikePE);
             }
 
             if(shortStraddle) {
-                if (closeVolumeList.get(closeVolumeList.size() - 1).getClose() > vwap * 1.1) {
+                /*if (closeVolumeList.get(closeVolumeList.size() - 1).getClose() > vwap * 1.1) {
                     //stoploss of 10% hit
                     profitLoss = quantityPerLot * (shortStraddleEntryPrice - closeVolumeList.get(closeVolumeList.size() - 1).getClose());
                     tradeLogs.add("Exiting Shorting straddle at "+closeVolumeList.get(closeVolumeList.size() - 1).date +" at price "+ closeVolumeList.get(closeVolumeList.size() - 1).getClose());
@@ -234,7 +241,7 @@ public class Serenity {
                     profitLoss = quantityPerLot * (shortStraddleEntryPrice - closeVolumeList.get(closeVolumeList.size() - 1).getClose());
                     tradeLogs.add("Exiting Shorting straddle at "+closeVolumeList.get(closeVolumeList.size() - 1).date +" at price "+ closeVolumeList.get(closeVolumeList.size() - 1).getClose());
                     return true;
-                }else if(closeVolumeList.get(closeVolumeList.size()-1).date.getHours() >= 15 && closeVolumeList.get(closeVolumeList.size()-1).date.getMinutes()>=20){
+                }else*/ if(closeVolumeList.get(closeVolumeList.size()-1).date.getHours() >= 15 && closeVolumeList.get(closeVolumeList.size()-1).date.getMinutes()>=20){
                     //exit at 15:20
                     profitLoss = quantityPerLot * (shortStraddleEntryPrice - closeVolumeList.get(closeVolumeList.size() - 1).getClose());
                     tradeLogs.add("Exiting Shorting straddle at "+closeVolumeList.get(closeVolumeList.size() - 1).date +" at price "+ closeVolumeList.get(closeVolumeList.size() - 1).getClose());
