@@ -229,7 +229,7 @@ public class StraddleWithVwapMultiEntry {
 
             if(!finalExit){
             if (!shortStraddle) {
-                if (closeVolumeList.get(closeVolumeList.size() - 1).getClose() < vwap && (closeVolumeList.size() < 4 || closeVolumeList.get(closeVolumeList.size() - 4).getClose() > vwap)) {
+                if ((closeVolumeList.get(closeVolumeList.size() - 1).getClose() < vwap) && ((closeVolumeList.size() < 2) || closeVolumeList.get(closeVolumeList.size() - 2).getClose() > vwap)) {
                     if (closeVolumeList.get(closeVolumeList.size() - 1).date.getHours() >= 15 && closeVolumeList.get(closeVolumeList.size() - 1).date.getMinutes() >= 15) {
                         return true;
                     } else {
