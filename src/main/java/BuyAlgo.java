@@ -28,7 +28,7 @@ public class BuyAlgo {
         Map<Date, Float> DATE_PROFIT_MAP = new TreeMap<>();
         Map<Date, List<String>> STRING_LIST_MAP = new TreeMap<>();
 
-        PrintWriter printWriter = new PrintWriter(new File("FinalResults/backTestOutput/result-chaos-atm" + "-" + new Date().getTime()));
+        PrintWriter printWriter = new PrintWriter(new File("FinalResults/backTestOutput/" +BuyAlgo.class.getSimpleName()+ "-" + new Date().getTime()));
         printWriter.flush();
         File fileo = new File("FinalResults/input/atm");
         File[] files = fileo.listFiles();
@@ -92,19 +92,26 @@ public class BuyAlgo {
         int lossHits = 0;
 
         double aDouble = 0;
+
+        float avgLoss = 0 ;
+        float avgProfit = 0;
+
         for (Map.Entry<Date, Float> dateDoubleEntry : DATE_PROFIT_MAP.entrySet()) {
             aDouble = aDouble + dateDoubleEntry.getValue();
-            if (dateDoubleEntry.getValue() >= 0) {
+            if (dateDoubleEntry.getValue() > 0) {
                 profitHits = profitHits + 1;
+                avgProfit  =avgProfit + dateDoubleEntry.getValue();
             }
             if (dateDoubleEntry.getValue() < 0) {
                 lossHits = lossHits + 1;
+                avgLoss = avgLoss + dateDoubleEntry.getValue();
             }
             totalDays = totalDays + 1;
             printWriter.println(dateDoubleEntry.getKey().toString() + " : " + dateDoubleEntry.getValue());
-
         }
         printWriter.println("total profit = " + aDouble + ", profit hits : " + profitHits + "/" + totalDays + ", loss hits " + lossHits + "/" + totalDays + ", orders : " + trades.get() + " order cost " + (trades.get() * 40));
+        printWriter.println("avg profit = "+(avgProfit/profitHits));
+        printWriter.println("avg loss = "+(avgLoss/lossHits));
         printWriter.flush();
         printWriter.println("_______________________________________________");
         printWriter.println("_______________________________________________");
@@ -231,12 +238,21 @@ public class BuyAlgo {
             float ceVwap = cePriceVolumeSum/ceVolumeSum;
             float peVwap = pePriceVolumeSum/peVolumeSum;
 
-            if (!shortStraddle && closeVolumeList.get(closeVolumeList.size() - 1).getClose() > straddleVwap * 1.15) {
-                if(normalCandleListCE.get(normalCandleListCE.size()-1).getClose() > ceVwap){
+
+            float ceClose = normalCandleListCE.get(normalCandleListCE.size()-1).getClose();
+            float peClose = normalCandleListPE.get(normalCandleListCE.size()-1).getClose();
+            float straddleClose = closeVolumeList.get(closeVolumeList.size() - 1).getClose();
+
+            float all = straddleClose/straddleVwap;
+            float ce = ceClose/ceVwap;
+            float pe = peClose/peVwap;
+
+            if (!shortStraddle &&  ((all > 1.15) || ce > 1.7 || pe > 1.7)) {
+                if(ceClose > ceVwap){
                     shortStraddleEntryPrice = normalCandleListCE.get(normalCandleListCE.size()-1).getClose();
                     shortStraddle = true;
                     strike = strikeCE;
-                }else if(normalCandleListPE.get(normalCandleListPE.size()-1).getClose() > peVwap){
+                }else if(peClose > peVwap){
                     shortStraddleEntryPrice = normalCandleListPE.get(normalCandleListPE.size()-1).getClose();
                     shortStraddle = true;
                     strike = strikePE;
@@ -247,22 +263,17 @@ public class BuyAlgo {
             if (shortStraddle) {
                 float exitPrice = StringUtils.equals(strike, strikeCE) ? normalCandleListCE.get(normalCandleListCE.size()-1).getClose() : normalCandleListPE.get(normalCandleListCE.size()-1).getClose();
                 float exitVwap= StringUtils.equals(strike, strikeCE) ? ceVwap : peVwap;
+                float tempPL = -1 * quantityPerLot * (shortStraddleEntryPrice - exitPrice);
+
                 if (closeVolumeList.get(closeVolumeList.size() - 1).getClose() > straddleVwap * 1.6) {
-                    //profit of 10% hit
                     profitLoss = -1 * quantityPerLot * (shortStraddleEntryPrice - exitPrice);
                     tradeLogs.add("Exiting Long straddle at " + closeVolumeList.get(closeVolumeList.size() - 1).date + " at price " + exitPrice);
                     return true;
-                } else if (closeVolumeList.get(closeVolumeList.size() - 1).getClose() < straddleVwap * 1.0 || exitPrice < exitVwap*1.2) {
-                    if("33700CE".equals(strike)){
-                        System.out.println();
-                    }
-
-                    //stoploss of 5% hit
+                } else if (closeVolumeList.get(closeVolumeList.size() - 1).getClose() < straddleVwap * 1.0 || exitPrice < exitVwap*1.2 || tempPL < -3000) {
                     profitLoss = -1 * quantityPerLot * (shortStraddleEntryPrice - exitPrice);
                     tradeLogs.add("Exiting Long straddle at " + closeVolumeList.get(closeVolumeList.size() - 1).date + " at price " + exitPrice);
                     return true;
                 } else if (closeVolumeList.get(closeVolumeList.size() - 1).date.getHours() >= 15 && closeVolumeList.get(closeVolumeList.size() - 1).date.getMinutes() >= 15) {
-                    //exit at 15:15
                     profitLoss = -1 * quantityPerLot * (shortStraddleEntryPrice - exitPrice);
                     tradeLogs.add("Exiting Long straddle at " + closeVolumeList.get(closeVolumeList.size() - 1).date + " at price " + exitPrice);
                     return true;
